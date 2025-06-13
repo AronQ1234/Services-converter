@@ -51,11 +51,23 @@ def convert_html_file_to_pdf(input_html_path: str, output_pdf_path: str) -> bool
         pisa_status = pisa.CreatePDF(html_string, dest=pdf_file)
     return not pisa_status.err
 
+def clean_directory(path: Path):
+    for item in path.iterdir():
+        try:
+            if item.is_file() or item.is_symlink():
+                item.unlink()
+            elif item.is_dir():
+                shutil.rmtree(item)
+        except Exception as e:
+            print(f"Failed to delete {item}: {e}")
+
+clean_directory(Path("uploads"))
+clean_directory(Path("convert_temp"))
 pypandoc.download_pandoc()
 
 
 @app.post("/convert/")
-async def convert_file(file: UploadFile = File(...), target_format: str = Form(...)):
+async def convert_file(file: UploadFile = File(...), target_format: str = Form(...), background_tasks: BackgroundTasks = None):
     input_path = CONVERT_DIR / f"{uuid4()}_{file.filename}"
     output_path = CONVERT_DIR / f"{input_path.stem}_converted.{target_format}"
     media_type = media_types.get(target_format.lower(), "application/octet-stream")
@@ -172,14 +184,18 @@ async def convert_file(file: UploadFile = File(...), target_format: str = Form(.
         if not output_path.exists():
             raise HTTPException(status_code=500, detail="Conversion failed: Output file was not created")
 
+        if background_tasks:
+            background_tasks.add_task(delete_file_later, input_path)
+            background_tasks.add_task(delete_file_later, output_path)
+        
         return FileResponse(output_path, filename=output_path.name, media_type=media_type)
 
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Conversion error: {str(e)}")
 
-async def delete_file_later(path: Path, delay: int = 5):
-    await asyncio.sleep(delay*1000)
+async def delete_file_later(path: Path, delay: int = 10):
+    await asyncio.sleep(delay)
     try: path.unlink()
     except FileNotFoundError: pass
 
@@ -195,7 +211,7 @@ async def upload_docx(file: UploadFile = File(...), background_tasks: Background
 
     background_tasks.add_task(delete_file_later, saved_path)
 
-    return {"url": f"/temp-files/{saved_path.name}"}
+    return {"url": f"/view/{saved_path.name}"}
 
 @app.get("/view/{filename}")
 async def get_temp_file(filename: str):
