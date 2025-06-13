@@ -124,8 +124,8 @@ async def convert_file(file: UploadFile = File(...), target_format: str = Form(.
                 f.write(html_content)
         
         elif ext in [".html", ".docx", ".doc", ".txt"] and target_format in ["rtf", "html"]:
-                pandoc_from = "md" if ext == ".txt" else ext
-                pypandoc.convert_file(str(input_path), target_format, format=pandoc_from, outputfile=str(output_path))
+            pandoc_from = "md" if ext == ".txt" else ext.lstrip(".")
+            pypandoc.convert_file(str(input_path), target_format, format=pandoc_from, outputfile=str(output_path))
         
         elif ext == ".pdf" and target_format == "rtf":
             doc = pymupdf.open(str(input_path))
