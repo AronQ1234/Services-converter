@@ -31,8 +31,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-UPLOAD_DIR = Path("uploads"); UPLOAD_DIR.mkdir(exist_ok=True)
 CONVERT_DIR = Path("convert_temp"); CONVERT_DIR.mkdir(exist_ok=True)
 PIXEL_SIZE = 2
 
@@ -60,10 +58,11 @@ def clean_directory(path: Path):
                 shutil.rmtree(item)
         except Exception as e:
             print(f"Failed to delete {item}: {e}")
-
-clean_directory(Path("uploads"))
+            
 clean_directory(Path("convert_temp"))
 pypandoc.download_pandoc()
+pypandoc_path = Path('pandoc-3.7.0.2-windows-x86_64.msi')
+pypandoc_path.unlink()
 
 
 @app.post("/convert/")
@@ -198,24 +197,3 @@ async def delete_file_later(path: Path, delay: int = 10):
     await asyncio.sleep(delay)
     try: path.unlink()
     except FileNotFoundError: pass
-
-@app.post("/upload-temp-docx/")
-async def upload_docx(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
-    if not file.filename.endswith(".docx"):
-        raise HTTPException(status_code=400, detail="Only .docx files allowed")
-
-    file_id = uuid4().hex
-    saved_path = UPLOAD_DIR / f"{file_id}_{file.filename}"
-    with saved_path.open("wb") as f:
-        shutil.copyfileobj(file.file, f)
-
-    background_tasks.add_task(delete_file_later, saved_path)
-
-    return {"url": f"/view/{saved_path.name}"}
-
-@app.get("/view/{filename}")
-async def get_temp_file(filename: str):
-    file_path = UPLOAD_DIR / filename
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(file_path)
