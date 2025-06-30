@@ -61,7 +61,7 @@ def clean_directory(path: Path):
             
 clean_directory(Path("convert_temp"))
 pypandoc.download_pandoc()
-pypandoc_path = Path('pandoc-3.7.0.2-windows-x86_64.msi')
+pypandoc_path = Path('pandoc-3.7.0.2-1-amd64.deb')
 pypandoc_path.unlink()
 
 
